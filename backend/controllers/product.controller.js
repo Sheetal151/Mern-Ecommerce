@@ -46,14 +46,18 @@ export const createProduct = async (req, res) => {
 		let cloudinaryResponse = null;
 
 		if (image) {
-			cloudinaryResponse = await cloudinary.uploader.upload(image, { folder: "products" });
+			cloudinaryResponse = await cloudinary.uploader.upload(image, {
+				folder: "products",
+			});
 		}
 
 		const product = await Product.create({
 			name,
 			description,
 			price,
-			image: cloudinaryResponse?.secure_url ? cloudinaryResponse.secure_url : "",
+			image: cloudinaryResponse?.secure_url
+				? cloudinaryResponse.secure_url
+				: "",
 			category,
 		});
 
@@ -126,6 +130,21 @@ export const getProductsByCategory = async (req, res) => {
 	}
 };
 
+export const searchProduct = async (req, res) => {
+	try {
+		const { q } = req.query;
+		const products = await Product.find({
+			
+			name: { $regex: q, $options: "i" },
+		});
+
+		res.status(200).json(products);
+	} catch (error) {
+		console.error("Error searching products:", error);
+		res.status(500).json({ message: "Server error" });
+	}
+};
+
 export const toggleFeaturedProduct = async (req, res) => {
 	try {
 		const product = await Product.findById(req.params.id);
@@ -153,3 +172,57 @@ async function updateFeaturedProductsCache() {
 		console.log("error in update cache function");
 	}
 }
+
+export const updateProduct = async (req, res) => {
+	try {
+		const { id } = req.params;
+		const { name, description, price, category, image } = req.body;
+
+		const product = await Product.findById(id);
+
+		if (!product) {
+			return res.status(404).json({
+				message: "Product not found",
+			});
+		}
+
+		let imageUrl = product.image;
+
+		// Upload new image if provided
+		if (image && image !== product.image) {
+			// Delete old image
+			if (product.image) {
+				const publicId = product.image
+					.split("/")
+					.pop()
+					.split(".")[0];
+
+				await cloudinary.uploader.destroy(
+					`products/${publicId}`
+				);
+			}
+
+			// Upload new image
+			const uploadedImage = await cloudinary.uploader.upload(image, {
+				folder: "products",
+			});
+
+			imageUrl = uploadedImage.secure_url;
+		}
+
+		product.name = name;
+		product.description = description;
+		product.price = price;
+		product.category = category;
+		product.image = imageUrl;
+
+		await product.save();
+
+		res.status(200).json(product);
+	} catch (error) {
+		console.log(error);
+		res.status(500).json({
+			message: "Server Error",
+		});
+	}
+};

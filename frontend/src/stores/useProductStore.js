@@ -79,4 +79,17 @@ export const useProductStore = create((set) => ({
 			console.log("Error fetching featured products:", error);
 		}
 	},
+	searchProduct: async (query) => {
+		try {
+			const response = await axios.get(
+				 `/products/search?q=${query}`
+			);
+
+			set({
+				products: response.data,
+			});
+		} catch (error) {
+			console.log(error);
+		}
+	},
 }));
